@@ -9,7 +9,7 @@ internal static class Program
         if (args.Length == 2 && args[0] == "--check-ui")
         {
             Directory.CreateDirectory(args[1]);
-            using var hero = new HeroWindow();
+            using var hero = new HeroWindow(new Preferences { Sound = false }, _ => { });
             using var settings = new SettingsWindow(new Preferences());
             foreach (var (form, name) in new (Form, string)[] { (hero, "companion"), (settings, "settings") })
             {
@@ -53,14 +53,21 @@ internal static class Program
             }
             return;
         }
-        Application.Run(new HeroWindow());
+        using var instance = new SingleInstance();
+        if (!instance.IsPrimary) { instance.RequestShow(); return; }
+        using var window = new HeroWindow();
+        using var activationTimer = new System.Windows.Forms.Timer { Interval = 250 };
+        activationTimer.Tick += (_, _) => { if (instance.ConsumeShowRequest() && !window.IsDisposed) window.Show(); };
+        activationTimer.Start();
+        Application.Run(window);
     }
 }
 
 public sealed class HeroWindow : Form
 {
     private readonly PostureAudio audio = new();
-    private readonly Routine routine = new(PreferenceStore.Load());
+    private readonly Routine routine;
+    private readonly Action<Preferences> savePreferences;
     private readonly System.Windows.Forms.Timer timer = new() { Interval = 100 };
     private readonly NotifyIcon tray;
     private readonly ToolTip tooltip = new() { InitialDelay = 250, ReshowDelay = 100, AutoPopDelay = 10000 };
@@ -74,6 +81,11 @@ public sealed class HeroWindow : Form
     private Point? dragOrigin;
     private Point windowOrigin;
     private string lastTip = "";
+    private SettingsWindow? settingsWindow;
+    private bool resourcesDisposed;
+    internal bool TimerRunning => timer.Enabled;
+    internal bool ResourcesDisposed => resourcesDisposed;
+    internal Routine CurrentRoutine => routine;
 
     // A tool window without activation: the companion does not interrupt typing.
     protected override bool ShowWithoutActivation => true;
@@ -82,8 +94,12 @@ public sealed class HeroWindow : Form
         get { var cp = base.CreateParams; cp.ExStyle |= 0x08000000 | 0x00000080; return cp; }
     }
 
-    public HeroWindow()
+    public HeroWindow() : this(PreferenceStore.Load(), PreferenceStore.Save) { }
+
+    internal HeroWindow(Preferences preferences, Action<Preferences> savePreferences)
     {
+        routine = new Routine(preferences);
+        this.savePreferences = savePreferences;
         Text = "StandUp Hero";
         Icon = AppAssets.Icon;
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -138,8 +154,8 @@ public sealed class HeroWindow : Form
         menu.Items.Add("Configurar rotina…", null, (_, _) => EditSettings());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Mostrar companheiro", null, (_, _) => Show());
-        menu.Items.Add("Ocultar companheiro", null, (_, _) => Hide());
-        menu.Items.Add("Sair", null, (_, _) => Close());
+        menu.Items.Add("Ocultar (manter lembretes)", null, (_, _) => Hide());
+        menu.Items.Add("Encerrar aplicativo", null, (_, _) => Close());
         menu.Opening += (_, _) =>
         {
             RefreshRoutine();
@@ -151,28 +167,58 @@ public sealed class HeroWindow : Form
         timer.Tick += (_, _) => { scene.Frame = frame++ / 5; RefreshRoutine(); };
         RefreshRoutine();
         timer.Start();
-        FormClosed += (_, _) => { timer.Dispose(); tray.Dispose(); tooltip.Dispose(); menu.Dispose(); audio.Dispose(); };
+    }
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        base.OnFormClosing(e);
+        if (!e.Cancel) StopResources();
+    }
+    private void StopResources()
+    {
+        if (resourcesDisposed) return;
+        resourcesDisposed = true;
+        timer.Stop();
+        tray.Visible = false;
+        settingsWindow?.Close();
+        timer.Dispose(); tray.Dispose(); tooltip.Dispose(); menu.Dispose(); audio.Dispose();
+    }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) StopResources();
+        base.Dispose(disposing);
     }
     private bool Save()
     {
-        try { PreferenceStore.Save(routine.Settings); return true; }
+        try { savePreferences(routine.Settings); return true; }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { MessageBox.Show(this, "Não foi possível salvar a rotina. " + e.Message, "StandUp Hero"); return false; }
     }
-    private void EditSettings()
+    internal bool ApplyPreferences(Preferences preferences)
     {
-        using var dialog = new SettingsWindow(routine.Settings);
+        try { savePreferences(preferences); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        { MessageBox.Show(this, "Não foi possível salvar a rotina. " + e.Message, "StandUp Hero"); return false; }
+        audio.Play("Sem som");
+        routine.Configure(preferences);
+        stretchUntil = DateTime.MinValue;
+        TopMost = preferences.AlwaysOnTop;
+        RefreshRoutine();
+        return true;
+    }
+    internal void EditSettings()
+    {
+        if (settingsWindow is not null) { settingsWindow.Activate(); return; }
+        using var dialog = new SettingsWindow(routine.Settings, ApplyPreferences);
+        settingsWindow = dialog;
+        dialog.ExitRequested += (_, _) => Close();
         // A normal independent dialog can receive focus, unlike the mascot.
         dialog.TopMost = TopMost;
         dialog.StartPosition = FormStartPosition.CenterScreen;
-        if (dialog.ShowDialog() != DialogResult.OK) return;
-        var previous = routine.Settings;
-        routine.Configure(dialog.Result);
-        if (!Save()) routine.Configure(previous);
-        TopMost = routine.Settings.AlwaysOnTop;
-        RefreshRoutine();
+        try { dialog.ShowDialog(); }
+        finally { settingsWindow = null; }
     }
     private void RefreshRoutine()
     {
+        if (resourcesDisposed) return;
         if (routine.Tick(DateTimeOffset.Now))
         {
             stretchUntil = DateTime.Now.AddSeconds(5);

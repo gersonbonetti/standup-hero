@@ -22,6 +22,8 @@ jobs:
         run: dotnet run --project tests/RoutineChecks.csproj --configuration Release
       - name: Build application
         run: dotnet build StandUpHero.csproj --configuration Release
+      - name: Verify instance, reset, and shutdown
+        run: dotnet run --project tests/windows/LifecycleChecks.csproj --configuration Release
       - name: Publish portable Windows x64 application
         run: dotnet publish StandUpHero.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/StandUpHero
       - uses: actions/upload-artifact@v4

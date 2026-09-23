@@ -18,6 +18,17 @@ public sealed class Preferences
     public static readonly string[] SoundChoices = ["Subida suave", "Descida suave", "Sino", "Arcade", "Sem som"];
     public string Activity { get; set; } = "Trabalhando";
 
+    public Preferences WithDefaultRoutine()
+    {
+        var restored = (Preferences)MemberwiseClone();
+        var defaults = new Preferences();
+        restored.SittingMinutes = defaults.SittingMinutes;
+        restored.StandingMinutes = defaults.StandingMinutes;
+        restored.Days = defaults.Days;
+        restored.Slots = defaults.Slots;
+        return restored;
+    }
+
     public bool IsValid() => SittingMinutes is >= 1 and <= 240 && StandingMinutes is >= 1 and <= 240
         && Days is { Length: > 0 } && Days.All(d => (int)d is >= 0 and <= 6)
         && Slots is { Count: > 0 } && Slots.All(s => s.Start >= TimeSpan.Zero && s.End <= TimeSpan.FromDays(1) && s.Start < s.End)

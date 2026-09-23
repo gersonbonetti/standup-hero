@@ -3,13 +3,14 @@ namespace StandUpHero;
 public sealed class SettingsWindow : Form
 {
     public Preferences Result { get; private set; }
+    public event EventHandler? ExitRequested;
     private readonly NumericUpDown sitting = new() { Minimum = 1, Maximum = 240 }, standing = new() { Minimum = 1, Maximum = 240 };
     private readonly CheckedListBox days = new() { CheckOnClick = true };
     private readonly TextBox slots = new() { Multiline = true, ScrollBars = ScrollBars.Vertical };
     private readonly CheckBox top = new() { Text = "Manter o personagem sempre visível", AutoSize = true }, sound = new() { Text = "Som ao mudar de postura", AutoSize = true };
     private readonly PostureAudio audio = new();
     private static readonly DayOfWeek[] DayOrder = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
-    public SettingsWindow(Preferences current)
+    public SettingsWindow(Preferences current, Func<Preferences, bool>? apply = null)
     {
         Result = current;
         Text = "Sua rotina · StandUp Hero";
@@ -30,7 +31,9 @@ public sealed class SettingsWindow : Form
         Controls.Add(new Label { Text = "Exemplo:\n09:00-12:00\n13:00-18:00", Location = new Point(226, 283), AutoSize = true });
         top.Location = new Point(22, 355); top.Checked = current.AlwaysOnTop;
         sound.Location = new Point(22, 387); sound.Checked = current.Sound;
-        Controls.Add(new Label { Text = "Trabalhando e jogando seguem a rotina.\nRelaxando desativa os ciclos. Salvar reinicia o período.", Location = new Point(22, 425), AutoSize = true, Font = new Font("Segoe UI", 9) });
+        Controls.Add(new Label { Text = "Salvar reinicia o período. O reset é aplicado na hora.\nFechar esta tela mantém o mascote e os lembretes ativos.", Location = new Point(22, 425), AutoSize = true, Font = new Font("Segoe UI", 9) });
+        var resetStatus = new Label { Location = new Point(22, 467), AutoSize = true, Font = new Font("Segoe UI", 9) };
+        Controls.Add(resetStatus);
         var save = new Button { Text = "Salvar rotina", Location = new Point(278, 482), Size = new Size(132, 32) };
         var cancel = new Button { Text = "Cancelar", Location = new Point(160, 482), Size = new Size(108, 32), DialogResult = DialogResult.Cancel };
         var character = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(22, 54), Width = 175, AccessibleName = "Personagem" };
@@ -61,10 +64,15 @@ public sealed class SettingsWindow : Form
         var reset = new Button { Text = "Restaurar rotina padrão", Location = new Point(22, 388), Size = new Size(230, 30) };
         reset.Click += (_, _) =>
         {
-            var defaults = new Preferences();
+            var defaults = current.WithDefaultRoutine();
+            if (apply is not null && !apply(defaults)) return;
+            current = defaults;
+            Result = defaults;
+            audio.Play("Sem som");
             sitting.Value = defaults.SittingMinutes; standing.Value = defaults.StandingMinutes;
             for (int i = 0; i < 7; i++) days.SetItemChecked(i, defaults.Days.Contains(DayOrder[i]));
             slots.Text = string.Join(Environment.NewLine, defaults.Slots.Select(s => $"{s.Start:hh\\:mm}-{s.End:hh\\:mm}"));
+            resetStatus.Text = "Padrão aplicado: 45/15 min · seg–sex · 09:00–18:00.";
         };
         save.Click += (_, _) =>
         {
@@ -79,6 +87,7 @@ public sealed class SettingsWindow : Form
             var selected = Enumerable.Range(0, 7).Where(days.GetItemChecked).Select(i => DayOrder[i]).ToArray();
             if (selected.Length == 0 || windows.Count == 0) { MessageBox.Show(this, "Selecione pelo menos um dia e um horário."); return; }
             Result = new Preferences { SittingMinutes = (int)sitting.Value, StandingMinutes = (int)standing.Value, Days = selected, Slots = windows, AlwaysOnTop = top.Checked, Sound = sound.Checked, Activity = current.Activity, Character = character.Text, StandSound = standSound.Text, SitSound = sitSound.Text };
+            if (apply is not null && !apply(Result)) return;
             DialogResult = DialogResult.OK;
         };
         AcceptButton = save; CancelButton = cancel;
@@ -95,7 +104,13 @@ public sealed class SettingsWindow : Form
         var tabs = new TabControl { Location = new Point(12, 12), Size = new Size(456, 530) };
         tabs.TabPages.AddRange([routinePage, characterPage]);
         save.Location = new Point(336, 560); cancel.Location = new Point(218, 560);
-        Controls.AddRange([tabs, save, cancel]);
-        FormClosed += (_, _) => audio.Dispose();
+        var exit = new Button { Text = "Encerrar aplicativo", Location = new Point(12, 560), Size = new Size(185, 32) };
+        exit.Click += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
+        Controls.AddRange([tabs, exit, save, cancel]);
+    }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) audio.Dispose();
+        base.Dispose(disposing);
     }
 }

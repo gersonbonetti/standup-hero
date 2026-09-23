@@ -14,6 +14,7 @@ internal static class AppAssets
 
 internal sealed class PostureAudio : IDisposable
 {
+    private bool disposed;
     private readonly Dictionary<string, SoundPlayer> players = new();
     private readonly List<Stream> streams = new();
     public PostureAudio()
@@ -30,11 +31,14 @@ internal sealed class PostureAudio : IDisposable
     }
     public void Play(string choice)
     {
+        if (disposed) return;
         foreach (var player in players.Values) player.Stop();
         if (players.TryGetValue(choice, out var selected)) selected.Play();
     }
     public void Dispose()
     {
+        if (disposed) return;
+        disposed = true;
         foreach (var player in players.Values) { player.Stop(); player.Dispose(); }
         foreach (var stream in streams) stream.Dispose();
     }

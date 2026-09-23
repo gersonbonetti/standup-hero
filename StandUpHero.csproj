@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/StandUpHero.ico</ApplicationIcon>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Product>StandUp Hero</Product>
     <Description>Companheiro de desktop para alternar entre sentado e em pé.</Description>
   </PropertyGroup>

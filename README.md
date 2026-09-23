@@ -48,7 +48,7 @@ O mascote fica próximo à barra de tarefas, com fundo transparente, sem bordas 
 ## Baixar e executar
 
 1. Abra a página de [releases](https://github.com/gersonbonetti/standup-hero/releases/latest).
-2. Baixe **StandUpHero-v0.1.0-win-x64.zip**.
+2. Baixe **StandUpHero-v0.1.1-win-x64.zip**.
 3. Extraia **todo o conteúdo** para uma pasta.
 4. Execute **StandUpHero.exe**.
 
@@ -65,10 +65,16 @@ Esta é uma versão inicial, sem instalador, atualização automática ou assina
 | Mudar atividade ou postura | Clique com o botão direito e escolha a ação. |
 | Configurar a rotina | Dê dois cliques no mascote ou escolha **Configurar rotina** no menu. |
 | Alterar personagem e sons | Abra a aba **Personagem e sons** e clique em **Salvar rotina**. |
-| Voltar ao padrão | Na aba **Rotina**, clique em **Restaurar rotina padrão** e depois em **Salvar rotina**. |
-| Ocultar | Escolha **Ocultar companheiro**; os ciclos continuam ativos. |
+| Voltar ao padrão | Na aba **Rotina**, clique em **Restaurar rotina padrão**. A mudança é salva e aplicada imediatamente. |
+| Ocultar | Escolha **Ocultar (manter lembretes)**; os ciclos continuam ativos. |
 | Mostrar novamente | Dê dois cliques no ícone da bandeja. |
-| Encerrar | Escolha **Sair** no menu do mascote ou da bandeja. |
+| Encerrar | Escolha **Encerrar aplicativo** nas configurações, no menu do mascote ou na bandeja. |
+
+Fechar a tela de configurações volta ao mascote e mantém os lembretes ativos. Para parar os avisos e encerrar o processo, use **Encerrar aplicativo**. O app não instala um serviço do Windows.
+
+A partir da v0.1.1, apenas uma instância pode rodar por sessão do Windows. Abrir o executável novamente mostra o mascote já existente, mesmo que ele esteja oculto ou tenha sido aberto de outra pasta.
+
+**Atualizando da v0.1.0:** encerre todas as cópias antigas antes de abrir a nova versão. Se necessário, finalize os processos `StandUpHero.exe` antigos pelo Gerenciador de Tarefas; uma cópia antiga não conhece a proteção de instância única.
 
 ### Como os ciclos se comportam
 
@@ -77,7 +83,7 @@ Esta é uma versão inicial, sem instalador, atualização automática ou assina
 - Cada nova janela de atividade começa com um período sentado. Abrir o aplicativo no meio de um horário também inicia um ciclo completo.
 - Fora dos dias e horários escolhidos, ou em **Relaxando**, não há lembretes.
 - **Pausar** preserva o tempo restante enquanto você continua dentro do horário ativo. **Trocar postura** inicia a duração completa da outra etapa.
-- Salvar configurações ou mudar a atividade reinicia o ciclo.
+- Salvar configurações, restaurar a rotina padrão ou mudar a atividade reinicia o ciclo. O reset é imediato e preserva personagem e sons já salvos; fechar a tela depois dele não desfaz a restauração.
 - Após suspensão do computador, uma etapa vencida avança uma vez ao retomar; avisos atrasados não são reproduzidos em sequência.
 - As notificações podem ser silenciadas pelas configurações do Windows. Os sons do aplicativo podem ser desativados nas opções.
 
@@ -105,10 +111,11 @@ dotnet run --project StandUpHero.csproj
 
 ```powershell
 dotnet run --project tests/RoutineChecks.csproj
+dotnet run --project tests/windows/LifecycleChecks.csproj
 dotnet build StandUpHero.csproj -c Release
 ```
 
-Os testes cobrem transições, pausa, horários, dias, modo relaxando, retomada após suspensão, sobreposição de períodos e compatibilidade das preferências.
+Os 18 testes da rotina cobrem transições, pausa, horários, dias, modo relaxando, retomada após suspensão, sobreposição de períodos e compatibilidade das preferências. Outros 12 testes no Windows verificam instância única entre processos, reset imediato e encerramento dos recursos.
 
 Há também uma verificação visual que abre temporariamente as telas, salva capturas e verifica o reset sem gravar preferências:
 
@@ -120,7 +127,7 @@ dotnet run --project StandUpHero.csproj -- --check-ui artifacts/ui
 
 ```powershell
 dotnet publish StandUpHero.csproj -c Release -r win-x64 --self-contained true -o artifacts/release/StandUpHero
-Compress-Archive -Path artifacts/release/StandUpHero/* -DestinationPath artifacts/StandUpHero-v0.1.0-win-x64.zip -Force
+Compress-Archive -Path artifacts/release/StandUpHero/* -DestinationPath artifacts/StandUpHero-v0.1.1-win-x64.zip -Force
 ```
 
 Para uma distribuição menor, dependente do **.NET Desktop Runtime 8** no destino:
@@ -134,6 +141,7 @@ dotnet publish StandUpHero.csproj -c Release -o dist
 | Arquivo | Responsabilidade |
 | --- | --- |
 | `Program.cs` | Mascote, bandeja, menu e renderização pixel art. |
+| `SingleInstance.cs` | Impede timers duplicados e mostra o mascote existente ao reabrir. |
 | `Routine.cs` | Ciclos, agenda, preferências e persistência. |
 | `SettingsWindow.cs` | Tela de configuração e restauração do padrão. |
 | `AppAssets.cs` | Ícone e reprodução dos sons incorporados. |
