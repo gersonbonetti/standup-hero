@@ -1,0 +1,35 @@
+using StandUpHero;
+
+var settings = new Preferences();
+var routine = new Routine(settings);
+var monday = new DateTimeOffset(new DateTime(2026, 9, 21, 9, 0, 0, DateTimeKind.Local));
+int passed = 0;
+void Check(bool condition, string name) { if (!condition) throw new Exception(name); passed++; Console.WriteLine("OK " + name); }
+routine.Tick(monday);
+Check(routine.Active && !routine.Standing && routine.Remaining.TotalMinutes == 45, "Monday starts sitting");
+Check(routine.Tick(monday.AddMinutes(45)) && routine.Standing && routine.Remaining.TotalMinutes == 15, "Transition to standing");
+Check(routine.Tick(monday.AddMinutes(60)) && !routine.Standing, "Transition to sitting");
+routine.Tick(monday.AddMinutes(65)); routine.TogglePause(monday.AddMinutes(65)); routine.Tick(monday.AddMinutes(90));
+Check(routine.Paused && routine.Remaining.TotalMinutes == 40, "Pause freezes time");
+routine.TogglePause(monday.AddMinutes(90)); routine.Tick(monday.AddMinutes(95));
+Check(!routine.Paused && routine.Remaining.TotalMinutes == 35, "Resume preserves time");
+routine.Skip(monday.AddMinutes(95));
+Check(routine.Standing && routine.Remaining.TotalMinutes == 15, "Manual posture change");
+routine.Tick(monday.AddHours(9)); Check(!routine.Active, "End of scheduled window");
+routine.Tick(monday.AddDays(5)); Check(!routine.Active, "Weekend inactive");
+settings.Activity = "Relaxando"; routine.Tick(monday); Check(!routine.Active, "Relax mode inactive");
+settings.Activity = "Jogando"; routine.Tick(monday); Check(routine.Active && !routine.Standing, "Gaming follows routine");
+routine.Tick(monday.AddHours(4)); Check(routine.Standing && routine.Remaining.TotalMinutes == 15, "Sleep recovery advances once");
+settings.Slots = [new(TimeSpan.FromHours(9), TimeSpan.FromHours(12)), new(TimeSpan.FromHours(13), TimeSpan.FromHours(18))];
+routine.Configure(settings); routine.Tick(monday.AddHours(3.5)); Check(!routine.Active, "Lunch break inactive");
+routine.Tick(monday.AddHours(4)); Check(routine.Active && !routine.Standing, "Afternoon restarts sitting");
+settings.Slots = [new(TimeSpan.FromHours(9), TimeSpan.FromHours(12)), new(TimeSpan.FromHours(11), TimeSpan.FromHours(18))];
+Check(settings.WindowStart(monday.AddHours(4).LocalDateTime) == monday.LocalDateTime, "Overlapping windows merged");
+settings.SittingMinutes = 0; Check(!settings.IsValid(), "Invalid durations rejected");
+var legacy = System.Text.Json.JsonSerializer.Deserialize<Preferences>("{\"SittingMinutes\":30,\"Sound\":false}")!;
+Check(legacy.IsValid() && legacy.SittingMinutes == 30 && !legacy.Sound && legacy.Character == "Homem", "Legacy settings retain values and receive new defaults");
+var custom = new Preferences { Character = "Mulher", StandSound = "Arcade", SitSound = "Sem som" };
+var restored = System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(custom))!;
+Check(restored.IsValid() && restored.Character == "Mulher" && restored.StandSound == "Arcade" && restored.SitSound == "Sem som", "Character and separate sounds survive persistence");
+restored.StandSound = "missing"; Check(!restored.IsValid(), "Unknown sound rejected");
+Console.WriteLine($"{passed} checks passed.");

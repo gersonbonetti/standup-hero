@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/StandUpHero.ico</ApplicationIcon>
+    <Version>0.1.0</Version>
+    <Product>StandUp Hero</Product>
+    <Description>Companheiro de desktop para alternar entre sentado e em pé.</Description>
+  </PropertyGroup>
+  <ItemGroup><Compile Remove="tests/**/*.cs" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Assets/*" /></ItemGroup>
+</Project>

@@ -1,0 +1,31 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify routine
+        run: dotnet run --project tests/RoutineChecks.csproj --configuration Release
+      - name: Build application
+        run: dotnet build StandUpHero.csproj --configuration Release
+      - name: Publish portable Windows x64 application
+        run: dotnet publish StandUpHero.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/StandUpHero
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StandUpHero-win-x64
+          path: artifacts/StandUpHero/
+          if-no-files-found: error
