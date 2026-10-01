@@ -16,21 +16,67 @@ Pixel art, ciclos de sentado/em pé e uma rotina que cabe no seu dia — direto 
 
 ## A ideia
 
+Criei o StandUp Hero porque não encontrei um projeto que atendesse ao que eu procurava: um lembrete visual, simples e configurável para sair da cadeira durante o trabalho, integrado à área de trabalho. Daí veio a ideia de um pequeno personagem que acompanha esses momentos comigo. O apelido extraoficial é **Minha Coluna Hero**. 🙂
+
 Quem trabalha sentado pode facilmente perder a noção do tempo. O StandUp Hero transforma o lembrete de levantar em um personagem que acompanha sua rotina: ele trabalha sentado, se espreguiça, continua em pé e depois volta a sentar.
 
 O mascote fica próximo à barra de tarefas, com fundo transparente, sem bordas e sem ocupar um botão na barra. São **140 × 96 pixels lógicos**, que você pode arrastar para onde preferir.
+
+## Como instalar
+
+1. Abra a página de [releases](https://github.com/gersonbonetti/standup-hero/releases/latest).
+2. Baixe **StandUpHero-v0.1.2-win-x64.zip**.
+3. Extraia **todo o conteúdo** para uma pasta permanente, como `Documentos\StandUpHero`. Não execute de dentro do ZIP.
+4. Execute **StandUpHero.exe**. O mascote aparecerá próximo à barra de tarefas.
+5. Dê dois cliques no mascote para ajustar dias, horários, personagem e avisos.
+
+Para atualizar, use **Encerrar aplicativo**, extraia a nova versão e abra o executável. Suas preferências ficam salvas separadamente. Se usa a inicialização com o Windows e mudou de pasta, salve essa opção novamente no novo local.
+
+Para remover, desmarque **Iniciar com o Windows**, salve, encerre o app e exclua a pasta extraída.
+
+O pacote portátil inclui o runtime .NET e não exige instalação do SDK. A distribuição disponível é para **Windows x64**. Mantenha o executável junto dos demais arquivos extraídos.
+
+Esta é uma versão inicial, sem instalador, atualização automática ou assinatura digital. O Windows pode solicitar confirmação ao abrir o arquivo baixado.
 
 ## O que já funciona
 
 - **Personagem homem ou mulher**, com animações de postura e descanso.
 - **Ciclos configuráveis**: 45 minutos sentado e 15 em pé por padrão.
 - **Dias e horários**: segunda a sexta, das 9h às 18h por padrão; aceita vários períodos no mesmo dia, como manhã e tarde.
-- **Trabalhando e jogando** seguem os ciclos; **relaxando** desativa os lembretes.
+- **Trabalhando** segue os ciclos; **Relaxando** desativa os lembretes.
 - **Pausar, continuar e trocar postura** pelo menu do personagem.
 - **Sons separados** para levantar e sentar: Subida suave, Descida suave, Sino e Arcade, com prévia e opção de silêncio.
 - **Restaurar rotina padrão**, preservando a escolha do personagem e dos sons.
 - **Bandeja do Windows**, com ícone próprio, opção de ocultar e notificações nas mudanças de postura.
+- **Avisos visuais**, com balão discreto, seta persistente e botão para adiar por cinco minutos.
+- **Pausa ao bloquear o PC**, com retomada mediante sua escolha.
+- **Inicialização opcional com o Windows** e sugestão de relaxar ao retornar de uma pausa.
 - **Preferências locais**, sem conta, servidor ou envio de dados pela aplicação.
+
+## Sugestão discreta de atividade
+
+Agora há apenas dois status: **Trabalhando** e **Relaxando**. Nas preferências antigas, **Jogando** é convertido para **Relaxando** sem perder outros ajustes.
+
+Em **Configurar rotina → Atividade**, a detecção vem habilitada com um intervalo de **10 minutos** sem interação, ajustável entre 2 e 60 minutos. Após esse intervalo, **ao voltar a usar o computador**, aparece uma sugestão silenciosa: **Relaxar** ou **Continuar trabalhando**. Ela não muda o status ou o cronômetro por conta própria e some após 30 segundos. Há no máximo uma sugestão a cada 30 minutos enquanto o app estiver aberto.
+
+Inatividade pode ser leitura, reunião ou descanso; o aplicativo não tenta distinguir essas situações. Não há sugestão fora da rotina, com o timer pausado ou em Relaxando. Avisos de postura e telas de configuração têm prioridade.
+
+**Privacidade:** a cada 15 segundos, enquanto elegível, o app consulta apenas o tempo desde a última interação que o Windows já mantém para a sessão, usando [GetLastInputInfo](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getlastinputinfo). Não usa hooks de teclado/mouse, não lê quais teclas ou botões foram usados, não captura tela, não inspeciona aplicativos, não grava histórico e não envia esses dados. Somente os ajustes da opção são salvos. Desative a opção e clique em **Salvar rotina** para interromper as consultas.
+
+![Configurações da sugestão de atividade](docs/images/activity-settings.png)
+
+## Inicialização, bloqueio e adiamento
+
+Em **Configurar rotina → Windows**:
+
+- **Iniciar com o Windows** vem desativado. Marque e salve para abrir o mascote ao entrar na sua conta. Desmarcar e salvar remove a entrada de inicialização do próprio app. Não exige administrador. Se mover a pasta do aplicativo, abra-o no novo local e salve essa opção novamente.
+- **Pausar ao bloquear o computador** vem ativado. Ao bloquear a sessão (por exemplo, com Win+L), o tempo restante é preservado. Ao desbloquear, escolha **Continuar** ou **Manter pausado**. Uma pausa manual anterior é respeitada, sem novo pedido de confirmação. Fora do horário da rotina, o período encerrado não é retomado; se já começou outro horário, a rotina usa um novo período completo.
+
+No aviso de mudança de postura, **Daqui a 5 minutos** adia a troca: o mascote volta à postura anterior por cinco minutos e avisa novamente. A próxima etapa começa com a duração completa e os intervalos salvos não são alterados. O botão fica desativado nas prévias. Você também pode usar **Adiar aviso por 5 minutos** no menu enquanto houver uma troca elegível. Bloquear o computador durante o adiamento preserva o tempo que faltava.
+
+A inicialização usa apenas a entrada `StandUpHero` em `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`. O app só registra ou remove a entrada quando você salva configurações; não a reativa silenciosamente ao abrir. Os avisos de bloqueio se referem apenas à sessão atual e não exigem monitoramento de teclado, tela ou aplicativos. As outras preferências são mantidas.
+
+![Opções do Windows](docs/images/windows-settings.png)
 
 ## Configurações
 
@@ -45,18 +91,15 @@ O mascote fica próximo à barra de tarefas, com fundo transparente, sem bordas 
   </tr>
 </table>
 
-## Baixar e executar
-
-1. Abra a página de [releases](https://github.com/gersonbonetti/standup-hero/releases/latest).
-2. Baixe **StandUpHero-v0.1.1-win-x64.zip**.
-3. Extraia **todo o conteúdo** para uma pasta.
-4. Execute **StandUpHero.exe**.
-
-O pacote portátil inclui o runtime .NET e não exige instalação do SDK. A distribuição disponível é para **Windows x64**. Mantenha o executável junto dos demais arquivos extraídos.
-
-Esta é uma versão inicial, sem instalador, atualização automática ou assinatura digital. O Windows pode solicitar confirmação ao abrir o arquivo baixado.
-
 ## Como usar
+
+### Avisos visuais
+
+O aplicativo exibe um balão acima do mascote: **Hora de ficar em pé** ou **Pode sentar novamente**. Ele pulsa suavemente duas vezes e fica visível por 12 segundos, sem tirar o foco do aplicativo em uso. Depois, vira uma pequena seta persistente. Clique na seta para rever as opções, ou no mascote para dispensar o lembrete.
+
+Em **Configurar rotina → Avisos visuais**, você pode ajustar a duração entre 5 e 30 segundos, desativar os avisos ou testar as duas mensagens. A prévia é silenciosa e não altera o ciclo. O aviso aparece mesmo com o mascote oculto; ele acompanha sua posição e se mantém dentro do monitor. Desativar os avisos visuais não altera a preferência de som.
+
+![Configurações dos avisos visuais](docs/images/visual-alerts.png)
 
 | Ação | Como fazer |
 | --- | --- |
@@ -115,7 +158,7 @@ dotnet run --project tests/windows/LifecycleChecks.csproj
 dotnet build StandUpHero.csproj -c Release
 ```
 
-Os 18 testes da rotina cobrem transições, pausa, horários, dias, modo relaxando, retomada após suspensão, sobreposição de períodos e compatibilidade das preferências. Outros 12 testes no Windows verificam instância única entre processos, reset imediato e encerramento dos recursos.
+Os testes de rotina, preferências e inatividade cobrem transições, pausa, horários, dias, modo relaxando, retomada após suspensão, sobreposição de períodos e compatibilidade das preferências. As verificações no Windows cobrem instância única, reset, encerramento, avisos visuais, sugestões, ausência de mudança automática e interrupção das consultas ao desativar a detecção.
 
 Há também uma verificação visual que abre temporariamente as telas, salva capturas e verifica o reset sem gravar preferências:
 
@@ -127,7 +170,7 @@ dotnet run --project StandUpHero.csproj -- --check-ui artifacts/ui
 
 ```powershell
 dotnet publish StandUpHero.csproj -c Release -r win-x64 --self-contained true -o artifacts/release/StandUpHero
-Compress-Archive -Path artifacts/release/StandUpHero/* -DestinationPath artifacts/StandUpHero-v0.1.1-win-x64.zip -Force
+Compress-Archive -Path artifacts/release/StandUpHero/* -DestinationPath artifacts/StandUpHero-v0.1.2-win-x64.zip -Force
 ```
 
 Para uma distribuição menor, dependente do **.NET Desktop Runtime 8** no destino:
@@ -142,6 +185,11 @@ dotnet publish StandUpHero.csproj -c Release -o dist
 | --- | --- |
 | `Program.cs` | Mascote, bandeja, menu e renderização pixel art. |
 | `SingleInstance.cs` | Impede timers duplicados e mostra o mascote existente ao reabrir. |
+| `IdleDetection.cs` | Consulta mínima de inatividade e regras de sugestão, sem histórico. |
+| `IdleSuggestionNotice.cs` | Sugestão silenciosa com aceitação explícita. |
+| `StartupRegistration.cs` | Inicialização opcional por usuário e gravação com reversão em caso de erro. |
+| `SessionNotifications.cs` | Avisos de bloqueio e desbloqueio da sessão atual. |
+| `ResumeNotice.cs` | Confirmação para continuar depois do desbloqueio. |
 | `Routine.cs` | Ciclos, agenda, preferências e persistência. |
 | `SettingsWindow.cs` | Tela de configuração e restauração do padrão. |
 | `AppAssets.cs` | Ícone e reprodução dos sons incorporados. |
@@ -153,7 +201,7 @@ dotnet publish StandUpHero.csproj -c Release -o dist
 
 - O mascote fica acima da barra de tarefas; não se incorpora à barra do Windows.
 - A posição do mascote não é salva entre execuções.
-- Não inicia automaticamente com o Windows.
+- A inicialização com o Windows é opcional e depende de manter o executável na pasta registrada.
 - Os horários são iguais para todos os dias selecionados; períodos que cruzam a meia-noite não são aceitos.
 - Ainda não há instalador, suporte nativo a macOS/Linux ou personalização de sprites e arquivos de áudio pelo usuário.
 

@@ -11,12 +11,25 @@ public sealed class Preferences
     public DayOfWeek[] Days { get; set; } = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
     public List<TimeSlot> Slots { get; set; } = [new(TimeSpan.FromHours(9), TimeSpan.FromHours(18))];
     public bool AlwaysOnTop { get; set; } = true;
+    public bool StartWithWindows { get; set; }
+    public bool PauseOnLock { get; set; } = true;
     public bool Sound { get; set; } = true;
+    public bool VisualAlerts { get; set; } = true;
+    public int VisualAlertSeconds { get; set; } = 12;
+    public bool SuggestRelaxing { get; set; } = true;
+    public int IdleMinutes { get; set; } = 10;
     public string Character { get; set; } = "Homem";
     public string StandSound { get; set; } = "Subida suave";
     public string SitSound { get; set; } = "Descida suave";
     public static readonly string[] SoundChoices = ["Subida suave", "Descida suave", "Sino", "Arcade", "Sem som"];
-    public string Activity { get; set; } = "Trabalhando";
+    private string activity = "Trabalhando";
+    // Migrate the retired gaming mode without discarding other preferences.
+    public string Activity { get => activity; set => activity = value == "Jogando" ? "Relaxando" : value; }
+
+    public Preferences WithActivity(string value)
+    {
+        var updated = (Preferences)MemberwiseClone(); updated.Activity = value; return updated;
+    }
 
     public Preferences WithDefaultRoutine()
     {
@@ -30,9 +43,11 @@ public sealed class Preferences
     }
 
     public bool IsValid() => SittingMinutes is >= 1 and <= 240 && StandingMinutes is >= 1 and <= 240
+        && VisualAlertSeconds is >= 5 and <= 30
+        && IdleMinutes is >= 2 and <= 60
         && Days is { Length: > 0 } && Days.All(d => (int)d is >= 0 and <= 6)
         && Slots is { Count: > 0 } && Slots.All(s => s.Start >= TimeSpan.Zero && s.End <= TimeSpan.FromDays(1) && s.Start < s.End)
-        && Activity is "Trabalhando" or "Jogando" or "Relaxando"
+        && Activity is "Trabalhando" or "Relaxando"
         && Character is "Homem" or "Mulher" && SoundChoices.Contains(StandSound) && SoundChoices.Contains(SitSound);
 
     public DateTime? WindowStart(DateTime now)
@@ -62,23 +77,54 @@ public sealed class Routine
     public bool Standing { get; private set; }
     public bool Active { get; private set; }
     public TimeSpan Remaining { get; private set; }
+    public bool SessionLocked { get; private set; }
+    public bool AwaitingResume { get; private set; }
+    public bool CanSnooze { get; private set; }
+    public bool Snoozed { get; private set; }
     private DateTime? window;
     private DateTimeOffset deadline;
     public Routine(Preferences settings) { Settings = settings; }
     private TimeSpan Duration => TimeSpan.FromMinutes(Standing ? Settings.StandingMinutes : Settings.SittingMinutes);
     public void Configure(Preferences settings) { Settings = settings; Reset(); }
-    public void Reset() { window = null; Active = false; Standing = false; Paused = false; Remaining = Duration; }
+    public void Reset() { window = null; Active = false; Standing = false; Paused = false; AwaitingResume = false; CanSnooze = false; Snoozed = false; Remaining = Duration; }
+    public void SetSessionLocked(bool locked, DateTimeOffset now)
+    {
+        if (SessionLocked == locked) return;
+        SessionLocked = locked;
+        if (locked && Settings.PauseOnLock && Active && !Paused)
+        {
+            Remaining = deadline > now ? deadline - now : TimeSpan.Zero;
+            Paused = true; AwaitingResume = true; CanSnooze = false;
+        }
+        // Honor schedule changes while away; don't replay missed notifications.
+        if (!locked)
+        {
+            bool wasPaused = Paused, wasAwaitingResume = AwaitingResume;
+            Tick(now);
+            if (Active && wasPaused) { Paused = true; AwaitingResume = wasAwaitingResume; }
+        }
+    }
+    public bool Snooze(DateTimeOffset now)
+    {
+        if (!Active || Paused || SessionLocked || !CanSnooze || Settings.WindowStart(now.LocalDateTime) != window) return false;
+        Standing = !Standing;
+        Remaining = TimeSpan.FromMinutes(5); deadline = now + Remaining;
+        CanSnooze = false; Snoozed = true;
+        return true;
+    }
     public void TogglePause(DateTimeOffset now)
     {
-        if (!Active) return;
+        if (!Active || SessionLocked) return;
         if (Paused) deadline = now + Remaining;
         else Remaining = deadline > now ? deadline - now : TimeSpan.Zero;
         Paused = !Paused;
+        AwaitingResume = false; CanSnooze = false;
     }
     public void Skip(DateTimeOffset now)
     {
-        if (!Active) return;
+        if (!Active || SessionLocked) return;
         Standing = !Standing; Remaining = Duration; deadline = now + Remaining;
+        CanSnooze = false; Snoozed = false;
     }
     public bool Tick(DateTimeOffset now)
     {
@@ -87,7 +133,9 @@ public sealed class Routine
         if (!Active || currentWindow != window)
         {
             Active = true; window = currentWindow; Standing = false; Paused = false;
+            AwaitingResume = false; CanSnooze = false; Snoozed = false;
             deadline = now + Duration;
+            if (SessionLocked && Settings.PauseOnLock) { Paused = true; AwaitingResume = true; Remaining = Duration; }
         }
         if (Paused) return false;
         bool changed = false;
@@ -95,6 +143,7 @@ public sealed class Routine
         {
             // After sleep, start one fresh interval; don't replay missed reminders.
             Standing = !Standing; deadline = now + Duration; changed = true;
+            CanSnooze = !SessionLocked; Snoozed = false;
         }
         Remaining = deadline - now;
         return changed;
